@@ -47,6 +47,12 @@ public class EpisodiosService(IDbContextFactory<RodajeDbContext> contextos)
         return await db.Episodios.AsNoTracking().Where(e => e.SerieId == serieId).OrderBy(e => e.Numero).ToListAsync();
     }
 
+    public async Task<Episodio?> ObtenerAsync(int id)
+    {
+        await using var db = await contextos.CreateDbContextAsync();
+        return await db.Episodios.AsNoTracking().Include(e => e.Serie).SingleOrDefaultAsync(e => e.Id == id);
+    }
+
     /// <summary>Escenas del episodio en orden, con sus clips, diálogos y personajes detectados.</summary>
     public async Task<List<Escena>> ListarEscenasAsync(int episodioId)
     {

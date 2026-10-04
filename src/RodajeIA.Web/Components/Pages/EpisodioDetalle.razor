@@ -1,0 +1,146 @@
+@page "/episodios/{Id:int}"
+@implements IDisposable
+@inject EpisodiosService EpisodiosService
+@inject PromptFinalService PromptFinalService
+@inject ColaGeneracion ColaGeneracion
+@inject AvisosGeneracion AvisosGeneracion
+@inject IJSRuntime JS
+
+<PageTitle>@(episodio is null ? "Episodio" : $"Episodio {episodio.Numero}") · RodajeIA</PageTitle>
+
+@if (cargando)
+{
+    <p>Cargando…</p>
+}
+else if (episodio is null)
+{
+    <h1>Episodio no encontrado</h1>
+    <p><a href="">Volver a las series</a></p>
+}
+else
+{
+    <p><a href="series/@episodio.SerieId">← @episodio.Serie!.Nombre</a></p>
+    <h1>Episodio @episodio.Numero: @episodio.Titulo</h1>
+
+    @if (escenas.Count == 0)
+    {
+        <p class="vacio">Este episodio todavía no tiene guion. <a href="cargar-guion?serie=@episodio.SerieId&episodio=@episodio.Id">Cargar guion</a></p>
+    }
+    else
+    {
+        <div class="fila">
+            <button type="button" @onclick="GenerarAsync" disabled="@(!escenas.Any(e => e.Estado == EstadoGeneracion.Pendiente))">Generar</button>
+            <span class="vacio">
+                Genera las escenas pendientes. Definí antes las variantes de personaje: después de generar no se pueden cambiar.
+            </span>
+        </div>
+
+        @foreach (var escena in escenas)
+        {
+            <article class="escena" @key="escena.Id">
+                <h3>
+                    Escena @escena.Numero — @(escena.IntExt == IntExt.Int ? "INT." : "EXT.") @escena.Lugar — @escena.MomentoDelDia
+                    <span class="estado estado-@escena.Estado.ToString().ToLowerInvariant()">@Estado(escena.Estado)</span>
+                </h3>
+                <p>
+                    <strong>Personajes:</strong>
+                    @(escena.Personajes.Count == 0 ? "ninguno con hoja" : string.Join(", ", escena.Personajes.OrderBy(p => p.Nombre).Select(p => p.Nombre)))
+                    · @escena.Clips.Count clip(s)
+                </p>
+
+                @if (escena.Estado == EstadoGeneracion.Error)
+                {
+                    <div class="fila">
+                        <p class="errores">@escena.MotivoError</p>
+                        <button type="button" @onclick="() => ReintentarAsync(escena.Id)">Reintentar</button>
+                    </div>
+                }
+
+                @if (escena.Personajes.Count > 0)
+                {
+                    <VariantesEscena Escena="escena" Editable="@(escena.Estado is EstadoGeneracion.Pendiente or EstadoGeneracion.Error)" />
+                }
+
+                @if (prompts.TryGetValue(escena.Id, out var prompt))
+                {
+                    <div class="fila prompt-acciones">
+                        <strong>Prompt final</strong>
+                        <button type="button" @onclick="() => CopiarAsync(escena.Id, prompt)">Copiar prompt</button>
+                        @if (copiada == escena.Id)
+                        {
+                            <span class="exito">Copiado</span>
+                        }
+                    </div>
+                    <pre class="prompt">@prompt</pre>
+                }
+            </article>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private bool cargando = true;
+    private Episodio? episodio;
+    private List<Escena> escenas = [];
+    private Dictionary<int, string> prompts = [];
+    private int? copiada;
+
+    protected override void OnInitialized() => AvisosGeneracion.EpisodioCambio += AlCambiarEpisodio;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        episodio = await EpisodiosService.ObtenerAsync(Id);
+        await RecargarAsync();
+        cargando = false;
+    }
+
+    private async Task RecargarAsync()
+    {
+        escenas = await EpisodiosService.ListarEscenasAsync(Id);
+        prompts = await PromptFinalService.ArmarEpisodioAsync(Id);
+    }
+
+    // Los avisos llegan desde la generación en segundo plano, fuera del contexto de render.
+    private void AlCambiarEpisodio(int episodioId)
+    {
+        if (episodioId == Id)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await RecargarAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task GenerarAsync()
+    {
+        await ColaGeneracion.GenerarEpisodioAsync(Id);
+        await RecargarAsync();
+    }
+
+    private async Task ReintentarAsync(int escenaId)
+    {
+        await ColaGeneracion.ReintentarAsync(escenaId);
+        await RecargarAsync();
+    }
+
+    private async Task CopiarAsync(int escenaId, string prompt)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", prompt);
+        copiada = escenaId;
+    }
+
+    private static string Estado(EstadoGeneracion estado) => estado switch
+    {
+        EstadoGeneracion.Pendiente => "pendiente",
+        EstadoGeneracion.Generando => "generando…",
+        EstadoGeneracion.Generada => "generada",
+        _ => "error",
+    };
+
+    public void Dispose() => AvisosGeneracion.EpisodioCambio -= AlCambiarEpisodio;
+}

@@ -91,7 +91,7 @@ else
                     {
                         <tr>
                             <td>@episodio.Numero</td>
-                            <td>@episodio.Titulo</td>
+                            <td><a href="episodios/@episodio.Id">@episodio.Titulo</a></td>
                             <td>@(episodio.Guion is null ? "Sin guion" : "Cargado")</td>
                             <td><a href="cargar-guion?serie=@serie.Id&episodio=@episodio.Id">Cargar guion</a></td>
                         </tr>

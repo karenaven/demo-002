@@ -71,7 +71,10 @@
         <h2>Escenas del episodio</h2>
         @if (cargadoRecien)
         {
-            <p class="exito">Guion cargado. Las escenas quedaron pendientes de generación.</p>
+            <p class="exito">
+                Guion cargado. Las escenas quedaron pendientes de generación.
+                <a href="episodios/@episodioId">Ir al episodio para definir variantes y generar</a>
+            </p>
         }
 
         @foreach (var escena in escenas)

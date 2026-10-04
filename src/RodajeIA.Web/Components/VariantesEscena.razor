@@ -1,0 +1,150 @@
+@inject VariantesService VariantesService
+
+@* Variantes de personaje de una escena (RF-09). Solo se pueden cambiar mientras la escena no se genera (RF-09e). *@
+
+@if (variantes.Count > 0)
+{
+    <table class="variantes">
+        <thead>
+            <tr><th>Variante de</th><th>Edad</th><th>Peinado</th><th>Vestuario</th><th>Heridas/marcas</th>@if (Editable) {<th></th>}</tr>
+        </thead>
+        <tbody>
+            @foreach (var variante in variantes)
+            {
+                @if (editando == variante.Id)
+                {
+                    <tr>
+                        <td>@variante.Personaje!.Nombre</td>
+                        <td><input @bind="datosEdicion.Edad" placeholder="@variante.Personaje.Edad" aria-label="Edad" /></td>
+                        <td><input @bind="datosEdicion.Peinado" placeholder="@variante.Personaje.Peinado" aria-label="Peinado" /></td>
+                        <td><input @bind="datosEdicion.Vestuario" placeholder="@variante.Personaje.Vestuario" aria-label="Vestuario" /></td>
+                        <td><input @bind="datosEdicion.Heridas" placeholder="@variante.Personaje.Heridas" aria-label="Heridas/marcas" /></td>
+                        <td class="fila">
+                            <button type="button" @onclick="GuardarEdicionAsync">Guardar</button>
+                            <button type="button" class="secundario" @onclick="CancelarEdicion">Cancelar</button>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td>@variante.Personaje!.Nombre</td>
+                        <td>@Valor(variante.Edad)</td>
+                        <td>@Valor(variante.Peinado)</td>
+                        <td>@Valor(variante.Vestuario)</td>
+                        <td>@Valor(variante.Heridas)</td>
+                        @if (Editable)
+                        {
+                            <td class="fila">
+                                <button type="button" class="secundario" @onclick="() => Editar(variante)">Editar</button>
+                                <button type="button" class="secundario" @onclick="() => EliminarAsync(variante.Id)">Eliminar</button>
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@if (Editable && SinVariante.Any())
+{
+    <details>
+        <summary>Nueva variante de personaje para esta escena</summary>
+        <div class="formulario">
+            <label>
+                Personaje
+                <select @bind="personajeId">
+                    <option value="">Elegí un personaje</option>
+                    @foreach (var personaje in SinVariante)
+                    {
+                        <option value="@personaje.Id">@personaje.Nombre</option>
+                    }
+                </select>
+            </label>
+            <small>Completá solo los campos que cambian en esta escena; los vacíos quedan como en la hoja base.</small>
+            <label>Edad <input @bind="datosNueva.Edad" placeholder="@Elegido?.Edad" /></label>
+            <label>Peinado <input @bind="datosNueva.Peinado" placeholder="@Elegido?.Peinado" /></label>
+            <label>Vestuario <input @bind="datosNueva.Vestuario" placeholder="@Elegido?.Vestuario" /></label>
+            <label>Heridas/marcas <input @bind="datosNueva.Heridas" placeholder="@Elegido?.Heridas" /></label>
+            <button type="button" @onclick="CrearAsync" disabled="@(personajeId is null)">Crear variante</button>
+        </div>
+    </details>
+}
+
+<Errores Mensajes="errores" />
+
+@code {
+    [Parameter, EditorRequired]
+    public Escena Escena { get; set; } = default!;
+
+    /// <summary>Falso cuando la escena está generándose o generada (RF-09e).</summary>
+    [Parameter]
+    public bool Editable { get; set; }
+
+    private List<VariantePersonaje> variantes = [];
+    private int? personajeId;
+    private DatosVariante datosNueva = new();
+    private int? editando;
+    private DatosVariante datosEdicion = new();
+    private IReadOnlyList<string> errores = [];
+
+    private IEnumerable<Personaje> SinVariante =>
+        Escena.Personajes.Where(p => variantes.All(v => v.PersonajeId != p.Id)).OrderBy(p => p.Nombre);
+
+    private Personaje? Elegido => Escena.Personajes.SingleOrDefault(p => p.Id == personajeId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        variantes = await VariantesService.ListarAsync(Escena.Id);
+        if (!Editable)
+        {
+            editando = null;
+        }
+    }
+
+    private static string Valor(string? valor) => valor ?? "(como la hoja)";
+
+    private async Task CrearAsync()
+    {
+        var resultado = await VariantesService.CrearAsync(Escena.Id, personajeId!.Value, datosNueva);
+        errores = resultado.Errores;
+        if (resultado.Ok)
+        {
+            personajeId = null;
+            datosNueva = new();
+            variantes = await VariantesService.ListarAsync(Escena.Id);
+        }
+    }
+
+    private void Editar(VariantePersonaje variante)
+    {
+        editando = variante.Id;
+        datosEdicion = DatosVariante.De(variante);
+        errores = [];
+    }
+
+    private void CancelarEdicion()
+    {
+        editando = null;
+        errores = [];
+    }
+
+    private async Task GuardarEdicionAsync()
+    {
+        var resultado = await VariantesService.EditarAsync(editando!.Value, datosEdicion);
+        errores = resultado.Errores;
+        if (resultado.Ok)
+        {
+            editando = null;
+            variantes = await VariantesService.ListarAsync(Escena.Id);
+        }
+    }
+
+    private async Task EliminarAsync(int varianteId)
+    {
+        var resultado = await VariantesService.EliminarAsync(varianteId);
+        errores = resultado.Errores;
+        variantes = await VariantesService.ListarAsync(Escena.Id);
+    }
+}

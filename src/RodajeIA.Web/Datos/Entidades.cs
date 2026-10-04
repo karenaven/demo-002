@@ -93,10 +93,40 @@ public class Escena
 
     public EstadoGeneracion Estado { get; set; } = EstadoGeneracion.Pendiente;
 
+    /// <summary>Motivo del último intento fallido cuando la escena queda en "error" (RF-10b).</summary>
+    public string? MotivoError { get; set; }
+
     /// <summary>Personajes con hoja detectados al cargar el guion (RF-05b).</summary>
     public List<Personaje> Personajes { get; set; } = [];
 
     public List<Clip> Clips { get; set; } = [];
+
+    public List<VariantePersonaje> Variantes { get; set; } = [];
+}
+
+/// <summary>
+/// Variante de un personaje para una escena (RF-09a): reemplaza solo los campos no nulos de su hoja base.
+/// Como máximo una por personaje y escena.
+/// </summary>
+public class VariantePersonaje
+{
+    public int Id { get; set; }
+
+    public int EscenaId { get; set; }
+
+    public Escena? Escena { get; set; }
+
+    public int PersonajeId { get; set; }
+
+    public Personaje? Personaje { get; set; }
+
+    public string? Edad { get; set; }
+
+    public string? Peinado { get; set; }
+
+    public string? Vestuario { get; set; }
+
+    public string? Heridas { get; set; }
 }
 
 public class Clip
@@ -118,6 +148,9 @@ public class Clip
 
     /// <summary>Personajes con hoja detectados al cargar el guion (RF-05a).</summary>
     public List<Personaje> Personajes { get; set; } = [];
+
+    /// <summary>Bloque generado por la IA para este clip; nulo mientras la escena no está generada.</summary>
+    public Bloque? Bloque { get; set; }
 }
 
 public class LineaDialogo
@@ -137,4 +170,60 @@ public class LineaDialogo
     public string? Acotacion { get; set; }
 
     public required string Texto { get; set; }
+}
+
+/// <summary>Lista ordenada de tomas generadas por la IA para un clip.</summary>
+public class Bloque
+{
+    public int Id { get; set; }
+
+    public int ClipId { get; set; }
+
+    public Clip? Clip { get; set; }
+
+    public List<Toma> Tomas { get; set; } = [];
+}
+
+/// <summary>Toma de un bloque. Los campos técnicos son valores del vocabulario (RN-02); la acción es el único texto libre de la IA.</summary>
+public class Toma
+{
+    public int Id { get; set; }
+
+    public int BloqueId { get; set; }
+
+    public Bloque? Bloque { get; set; }
+
+    /// <summary>Posición de la toma dentro del bloque, desde 1.</summary>
+    public int Orden { get; set; }
+
+    public required string Plano { get; set; }
+
+    public required string Optica { get; set; }
+
+    public required string Iluminacion { get; set; }
+
+    public string? Angulo { get; set; }
+
+    public string? Movimiento { get; set; }
+
+    public required string Accion { get; set; }
+
+    /// <summary>Líneas de diálogo que se dicen en esta toma (RN-04), en el orden que indicó la IA.</summary>
+    public List<TomaDialogo> Dialogos { get; set; } = [];
+}
+
+public class TomaDialogo
+{
+    public int Id { get; set; }
+
+    public int TomaId { get; set; }
+
+    public Toma? Toma { get; set; }
+
+    public int LineaDialogoId { get; set; }
+
+    public LineaDialogo? LineaDialogo { get; set; }
+
+    /// <summary>Posición de la línea dentro de la toma, desde 1.</summary>
+    public int Orden { get; set; }
 }
