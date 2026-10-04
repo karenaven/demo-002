@@ -1,0 +1,160 @@
+@page "/series/{Id:int}"
+@inject SeriesService SeriesService
+@inject PersonajesService PersonajesService
+@inject EpisodiosService EpisodiosService
+
+<PageTitle>@(serie?.Nombre ?? "Serie") · RodajeIA</PageTitle>
+
+@if (cargando)
+{
+    <p>Cargando…</p>
+}
+else if (serie is null)
+{
+    <h1>Serie no encontrada</h1>
+    <p><a href="">Volver a las series</a></p>
+}
+else
+{
+    <p><a href="">← Series</a></p>
+    <h1>@serie.Nombre</h1>
+
+    <section>
+        <h2>Personajes</h2>
+        @if (personajes.Count == 0)
+        {
+            <p class="vacio">Todavía no hay hojas de personaje.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Nombre</th><th>Edad</th><th>Rol</th><th>Peinado</th><th>Vestuario</th><th>Heridas/marcas</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var personaje in personajes)
+                    {
+                        <tr>
+                            <td>@personaje.Nombre</td>
+                            <td>@personaje.Edad</td>
+                            <td>@personaje.Rol</td>
+                            <td>@personaje.Peinado</td>
+                            <td>@personaje.Vestuario</td>
+                            <td>@personaje.Heridas</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <details open="@(personajes.Count == 0)">
+            <summary>Nueva hoja de personaje</summary>
+            <EditForm Model="nuevoPersonaje" OnValidSubmit="CrearPersonajeAsync" FormName="nuevo-personaje" class="formulario">
+                <DataAnnotationsValidator />
+                <label>Nombre <small>(como aparece en el guion, con mayúscula inicial y tildes)</small>
+                    <InputText @bind-Value="nuevoPersonaje.Nombre" />
+                </label>
+                <ValidationMessage For="() => nuevoPersonaje.Nombre" />
+                <label>Edad <InputText @bind-Value="nuevoPersonaje.Edad" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.Edad" />
+                <label>Descripción física (incluye voz) <InputTextArea @bind-Value="nuevoPersonaje.DescripcionFisica" rows="3" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.DescripcionFisica" />
+                <label>Peinado <InputText @bind-Value="nuevoPersonaje.Peinado" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.Peinado" />
+                <label>Vestuario <InputText @bind-Value="nuevoPersonaje.Vestuario" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.Vestuario" />
+                <label>Heridas/marcas <small>(opcional)</small> <InputText @bind-Value="nuevoPersonaje.Heridas" /></label>
+                <label>Personalidad <InputTextArea @bind-Value="nuevoPersonaje.Personalidad" rows="2" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.Personalidad" />
+                <label>Rol <InputText @bind-Value="nuevoPersonaje.Rol" /></label>
+                <ValidationMessage For="() => nuevoPersonaje.Rol" />
+                <Errores Mensajes="erroresPersonaje" />
+                <button type="submit">Crear personaje</button>
+            </EditForm>
+        </details>
+    </section>
+
+    <section>
+        <h2>Episodios</h2>
+        @if (episodios.Count == 0)
+        {
+            <p class="vacio">Todavía no hay episodios.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr><th>Número</th><th>Título</th><th>Guion</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var episodio in episodios)
+                    {
+                        <tr>
+                            <td>@episodio.Numero</td>
+                            <td>@episodio.Titulo</td>
+                            <td>@(episodio.Guion is null ? "Sin guion" : "Cargado")</td>
+                            <td><a href="cargar-guion?serie=@serie.Id&episodio=@episodio.Id">Cargar guion</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <EditForm Model="nuevoEpisodio" OnValidSubmit="CrearEpisodioAsync" FormName="nuevo-episodio" class="fila">
+            <DataAnnotationsValidator />
+            <InputNumber @bind-Value="nuevoEpisodio.Numero" placeholder="Número" aria-label="Número" class="corto" />
+            <InputText @bind-Value="nuevoEpisodio.Titulo" placeholder="Título" aria-label="Título" />
+            <button type="submit">Crear episodio</button>
+            <ValidationSummary class="errores" />
+        </EditForm>
+        <Errores Mensajes="erroresEpisodio" />
+    </section>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private bool cargando = true;
+    private Serie? serie;
+    private List<Personaje> personajes = [];
+    private List<Episodio> episodios = [];
+    private DatosPersonaje nuevoPersonaje = new();
+    private DatosEpisodio nuevoEpisodio = new();
+    private IReadOnlyList<string> erroresPersonaje = [];
+    private IReadOnlyList<string> erroresEpisodio = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        serie = await SeriesService.ObtenerAsync(Id);
+        if (serie is not null)
+        {
+            personajes = await PersonajesService.ListarAsync(Id);
+            episodios = await EpisodiosService.ListarAsync(Id);
+        }
+
+        cargando = false;
+    }
+
+    private async Task CrearPersonajeAsync()
+    {
+        var resultado = await PersonajesService.CrearAsync(Id, nuevoPersonaje);
+        erroresPersonaje = resultado.Errores;
+        if (resultado.Ok)
+        {
+            nuevoPersonaje = new();
+            personajes = await PersonajesService.ListarAsync(Id);
+        }
+    }
+
+    private async Task CrearEpisodioAsync()
+    {
+        var resultado = await EpisodiosService.CrearAsync(Id, nuevoEpisodio);
+        erroresEpisodio = resultado.Errores;
+        if (resultado.Ok)
+        {
+            nuevoEpisodio = new();
+            episodios = await EpisodiosService.ListarAsync(Id);
+        }
+    }
+}

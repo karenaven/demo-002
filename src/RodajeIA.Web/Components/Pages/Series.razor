@@ -1,0 +1,49 @@
+@page "/"
+@inject SeriesService SeriesService
+
+<PageTitle>Series · RodajeIA</PageTitle>
+
+<h1>Series</h1>
+
+<form class="fila" @onsubmit="CrearAsync">
+    <input @bind="nombre" placeholder="Nombre de la serie" aria-label="Nombre de la serie" />
+    <button type="submit">Crear serie</button>
+</form>
+<Errores Mensajes="errores" />
+
+@if (series is null)
+{
+    <p>Cargando…</p>
+}
+else if (series.Count == 0)
+{
+    <p class="vacio">Todavía no hay series.</p>
+}
+else
+{
+    <ul class="lista">
+        @foreach (var serie in series)
+        {
+            <li><a href="series/@serie.Id">@serie.Nombre</a></li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Serie>? series;
+    private string? nombre;
+    private IReadOnlyList<string> errores = [];
+
+    protected override async Task OnInitializedAsync() => series = await SeriesService.ListarAsync();
+
+    private async Task CrearAsync()
+    {
+        var resultado = await SeriesService.CrearAsync(nombre);
+        errores = resultado.Errores;
+        if (resultado.Ok)
+        {
+            nombre = null;
+            series = await SeriesService.ListarAsync();
+        }
+    }
+}

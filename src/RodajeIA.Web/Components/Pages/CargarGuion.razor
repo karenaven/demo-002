@@ -1,0 +1,183 @@
+@page "/cargar-guion"
+@inject SeriesService SeriesService
+@inject EpisodiosService EpisodiosService
+@inject CargaGuionService CargaGuionService
+
+<PageTitle>Cargar guion · RodajeIA</PageTitle>
+
+<h1>Cargar guion</h1>
+
+<div class="formulario">
+    <label>
+        Serie
+        <select value="@serieId" @onchange="CambiarSerieAsync">
+            <option value="">Elegí una serie</option>
+            @foreach (var serie in series)
+            {
+                <option value="@serie.Id">@serie.Nombre</option>
+            }
+        </select>
+    </label>
+
+    <label>
+        Episodio
+        <select value="@episodioId" @onchange="CambiarEpisodioAsync" disabled="@(serieId is null)">
+            <option value="">Elegí un episodio</option>
+            @foreach (var episodio in episodios)
+            {
+                <option value="@episodio.Id">@episodio.Numero. @episodio.Titulo</option>
+            }
+        </select>
+    </label>
+
+    @if (EpisodioElegido?.Guion is not null)
+    {
+        <p class="aviso">
+            Este episodio ya tiene un guion. Si el nuevo es válido, va a reemplazar al anterior
+            y se van a borrar sus escenas, clips y bloques.
+        </p>
+    }
+
+    <label>
+        Guion (texto plano)
+        <textarea @bind="guion" rows="20" spellcheck="false"></textarea>
+    </label>
+
+    <button type="button" @onclick="CargarAsync" disabled="@(!PuedeCargar)">Cargar guion</button>
+</div>
+
+@if (error is not null)
+{
+    <Errores Mensajes="[error]" />
+}
+
+@if (erroresGuion.Count > 0)
+{
+    <section class="errores" role="alert">
+        <h2>El guion es inválido y no se guardó</h2>
+        <p>Corregí estos errores y volvé a cargarlo:</p>
+        <ul>
+            @foreach (var e in erroresGuion)
+            {
+                <li><strong>Línea @e.Linea:</strong> @e.Motivo</li>
+            }
+        </ul>
+    </section>
+}
+
+@if (escenas is not null)
+{
+    <section>
+        <h2>Escenas del episodio</h2>
+        @if (cargadoRecien)
+        {
+            <p class="exito">Guion cargado. Las escenas quedaron pendientes de generación.</p>
+        }
+
+        @foreach (var escena in escenas)
+        {
+            <article class="escena">
+                <h3>
+                    Escena @escena.Numero — @(escena.IntExt == IntExt.Int ? "INT." : "EXT.") @escena.Lugar — @escena.MomentoDelDia
+                    <span class="estado">@escena.Estado.ToString().ToLowerInvariant()</span>
+                </h3>
+                <p>
+                    <strong>Personajes:</strong>
+                    @(escena.Personajes.Count == 0 ? "ninguno con hoja" : string.Join(", ", escena.Personajes.Select(p => p.Nombre)))
+                </p>
+                <ol class="clips">
+                    @foreach (var clip in escena.Clips)
+                    {
+                        <li>
+                            Clip @clip.Numero: @clip.Dialogos.Count línea(s) de diálogo
+                            @if (clip.TextoEnPantalla is not null)
+                            {
+                                <text>, con texto en pantalla</text>
+                            }
+                            @if (clip.Personajes.Count > 0)
+                            {
+                                <text> · @string.Join(", ", clip.Personajes.Select(p => p.Nombre))</text>
+                            }
+                        </li>
+                    }
+                </ol>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "serie")]
+    public int? SerieInicial { get; set; }
+
+    [SupplyParameterFromQuery(Name = "episodio")]
+    public int? EpisodioInicial { get; set; }
+
+    private List<Serie> series = [];
+    private List<Episodio> episodios = [];
+    private int? serieId;
+    private int? episodioId;
+    private string? guion;
+    private string? error;
+    private IReadOnlyList<ErrorGuion> erroresGuion = [];
+    private List<Escena>? escenas;
+    private bool cargadoRecien;
+
+    private Episodio? EpisodioElegido => episodios.SingleOrDefault(e => e.Id == episodioId);
+
+    private bool PuedeCargar => serieId is not null && episodioId is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        series = await SeriesService.ListarAsync();
+        if (SerieInicial is { } serie && series.Any(s => s.Id == serie))
+        {
+            await ElegirSerieAsync(serie);
+            if (EpisodioInicial is { } episodio && episodios.Any(e => e.Id == episodio))
+            {
+                await ElegirEpisodioAsync(episodio);
+            }
+        }
+    }
+
+    private Task CambiarSerieAsync(ChangeEventArgs e) => ElegirSerieAsync(ParsearId(e));
+
+    private Task CambiarEpisodioAsync(ChangeEventArgs e) => ElegirEpisodioAsync(ParsearId(e));
+
+    private static int? ParsearId(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+
+    private async Task ElegirSerieAsync(int? id)
+    {
+        serieId = id;
+        episodios = id is null ? [] : await EpisodiosService.ListarAsync(id.Value);
+        await ElegirEpisodioAsync(null);
+    }
+
+    private async Task ElegirEpisodioAsync(int? id)
+    {
+        episodioId = id;
+        LimpiarResultado();
+        escenas = id is null ? null : await EpisodiosService.ListarEscenasAsync(id.Value);
+    }
+
+    private void LimpiarResultado()
+    {
+        error = null;
+        erroresGuion = [];
+        cargadoRecien = false;
+    }
+
+    private async Task CargarAsync()
+    {
+        LimpiarResultado();
+        var resultado = await CargaGuionService.CargarAsync(serieId, episodioId, guion);
+        error = resultado.Error;
+        erroresGuion = resultado.ErroresGuion;
+        if (resultado.Ok)
+        {
+            cargadoRecien = true;
+            episodios = await EpisodiosService.ListarAsync(serieId!.Value);
+            escenas = await EpisodiosService.ListarEscenasAsync(episodioId!.Value);
+        }
+    }
+}

@@ -1,0 +1,14 @@
+@if (Mensajes.Count > 0)
+{
+    <ul class="errores" role="alert">
+        @foreach (var mensaje in Mensajes)
+        {
+            <li>@mensaje</li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<string> Mensajes { get; set; } = [];
+}
