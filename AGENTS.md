@@ -1,7 +1,7 @@
 # AGENTS.md — RodajeIA
 
 ## Propósito
-App web para productoras/es de series generadas con IA: convierte guiones en bloques de tomas (plano, óptica, iluminación, mas ángulo y movimiento como opcionales) y prompts listos para copiar en la IA de video, manteniendo consistentes a los personajes entre escenas y episodios. Especificación completa: `PRD-002.md`.
+App web para productoras/es de series generadas con IA: convierte guiones en bloques de tomas (plano, óptica, iluminación, mas ángulo y movimiento como opcionales) y prompts listos para copiar en la IA de video, manteniendo consistentes a los personajes entre escenas y episodios. Especificación completa: `PRD.md`.
 
 ## Stack
 - .NET 10 — Blazor Web App (Interactive Server)
