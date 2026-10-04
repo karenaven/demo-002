@@ -103,13 +103,21 @@ Los tiempos se miden como p95 en el equipo local donde corre la app; RNF-03 y RN
 | --- | --- | --- |
 | RNF-03 | Validación y parseo de un guion de tamaño máximo (10 escenas × 20 clips) | < 1 s (p95) |
 | RNF-04 | Armado del prompt final por plantilla, por escena | < 1 s (p95) |
-| RNF-05 | Generación con Gemini de una escena de 20 clips | < 30 s (p95). Medición preliminar: una escena de 8 clips en 5 s (una corrida) |
+| RNF-05 | Generación con Gemini de una escena de 20 clips | < 30 s (p95). Medido en el spike: 22,2 s (p95), ver resultados abajo |
 | RNF-06 | Tiempo máximo de espera por llamada a Gemini | 60 s |
 | RNF-07 | Reintentos por escena ante error, timeout o respuesta inválida | 2 reintentos (3 intentos en total): espera de 10 s antes del primer reintento y de 30 s antes del segundo |
 
 RNF-01 y RNF-02 (límites de escenas y clips) pasaron al Anexo A porque son reglas de validación de RF-03a. RNF-08 (progreso por escena) pasó a RF-10a–c porque describe un comportamiento, no una métrica. Esos IDs no se reutilizan.
 
 **Spike técnico (primer entregable junto con el vocabulario):** medir con Gemini y salida estructurada el tiempo de 10 generaciones de una escena de 20 clips, y verificar con esos datos que se cumple RNF-05.
+
+**Resultado del spike (2026-10-04):** RNF-05 se cumple.
+
+- **Condiciones:** modelo `gemini-3.1-flash-lite`, salida estructurada con el schema generado desde `config/vocabulario.json` (vocabulario v0.1), 10 llamadas secuenciales sin reintentos. Escena de 20 clips con 14 líneas de diálogo, 2 personajes con hoja y 1 texto en pantalla, armada con el parser del guion y la instrucción de `config/instruccion-generacion.txt`.
+- **Tiempos (9 corridas exitosas):** mínimo 12,0 s; mediana 15,0 s; promedio 16,7 s; p95 y máximo 22,2 s.
+- **Validez:** las 9 respuestas cumplieron RN-02, RN-08, RN-09 y RN-10 al primer intento.
+- **Errores:** 1 de las 10 llamadas falló con un error 503 de Gemini por alta demanda. En la aplicación ese caso se reintenta según RNF-07; con un reintento, una escena de 20 clips tarda unos 37 s en total (5 s del error + 10 s de espera + ~22 s de generación).
+- **Observación:** las 9 respuestas devolvieron exactamente una toma por clip; Gemini no usó varias tomas por bloque para alternar plano y contraplano.
 
 **Criterio de demo:** el recorrido crear serie → crear personaje → crear episodio → pegar guion → pulsar "Generar" → ver bloques y prompt final se completa en menos de 2 minutos con una escena de 4 clips. Es un criterio de la demo, no un requerimiento del sistema.
 
@@ -274,7 +282,7 @@ No hay AC de control de acceso: la v1 es monousuario y local, sin login ni separ
 | La IA omite o repite una línea de diálogo | Validación post-respuesta de las referencias y reintento (RN-09) |
 | Guion mal formateado | RF-03 muestra errores con línea y motivo; se devuelve al guionista |
 | Un clip no entra en 8 s de Flow | Criterio del guionista en v1 |
-| Latencia de Gemini desconocida | Spike técnico antes de construir pantallas (RNF-05) |
+| Latencia de Gemini mayor que la esperada | Spike técnico realizado: p95 de 22,2 s para 20 clips, dentro de RNF-05 |
 | Se edita una hoja base (RF-01g) usada en escenas ya generadas, y la acción escrita por la IA queda contradiciendo la hoja nueva | Se acepta en v1: el prompt toma la hoja nueva y la acción se corrige a mano (RF-07c) |
 
 **Dependencias:**
