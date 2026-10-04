@@ -38,6 +38,7 @@ public sealed class PromptFinalTests : IDisposable
         Assert.Contains("Bloque 2:", prompt);
         Assert.DoesNotContain("{{", prompt);
         Assert.DoesNotContain(": .", prompt);
+        Assert.DoesNotContain("..", prompt.Replace("Bueno...", "", StringComparison.Ordinal));
     }
 
     // Anexo D: plantilla de la toma y cierre del bloque.
@@ -127,6 +128,24 @@ public sealed class PromptFinalTests : IDisposable
         Assert.Contains("Heridas/marcas: cicatriz en la ceja.", Descripcion(await e.PromptAsync(1), "Ana"));
     }
 
+    // Puntuación del molde: cada campo de la hoja cierra con un solo punto, lo traiga o no el valor.
+    [Fact]
+    public async Task Hoja_CadaCampoCierraConUnSoloPunto()
+    {
+        var hoja = SeriesYPersonajesTests.HojaCompleta("Ana");
+        hoja.DescripcionFisica = "Mujer latina, ojos marrones";
+        hoja.Personalidad = "Irónica y leal.";
+        hoja.Heridas = "cicatriz en la ceja.";
+        Assert.True((await new PersonajesService(e.Db).CrearAsync(e.Serie.Id, hoja)).Ok);
+        await e.CargarGuionAsync(Unir(EscenaValida));
+        await e.GenerarEpisodioAsync();
+
+        Assert.Equal(
+            "Ana, 28 años. Mujer latina, ojos marrones. Peinado: trenza larga. Vestuario: chaqueta negra. "
+            + "Heridas/marcas: cicatriz en la ceja. Personalidad: Irónica y leal. Rol: Protagonista.",
+            Descripcion(await e.PromptAsync(1), "Ana"));
+    }
+
     // AC-08e
     [Fact]
     public async Task MismoPersonajeSinVariantes_DescripcionIdenticaEnDosEscenas()
@@ -199,11 +218,11 @@ public sealed class PromptFinalTests : IDisposable
         var hoja = SeriesYPersonajesTests.HojaCompleta("Ana");
         Assert.Equal(
             $"Ana, 60 años. {hoja.DescripcionFisica} Peinado: moño gris. Vestuario: abrigo gris. Heridas/marcas: brazo vendado. "
-            + $"Personalidad: {hoja.Personalidad}. Rol: {hoja.Rol}.",
+            + $"Personalidad: {hoja.Personalidad} Rol: {hoja.Rol}.",
             escena2);
         Assert.Equal(
             $"Ana, {hoja.Edad}. {hoja.DescripcionFisica} Peinado: {hoja.Peinado}. Vestuario: chaqueta negra. "
-            + $"Personalidad: {hoja.Personalidad}. Rol: {hoja.Rol}.",
+            + $"Personalidad: {hoja.Personalidad} Rol: {hoja.Rol}.",
             escena1);
     }
 

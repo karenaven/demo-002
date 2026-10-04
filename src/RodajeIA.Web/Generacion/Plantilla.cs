@@ -6,6 +6,8 @@ namespace RodajeIA.Web.Generacion;
 /// <summary>
 /// Rellena las plantillas de <c>config/molde-prompt.json</c>: <c>{{variable}}</c> se reemplaza literal por su valor
 /// (RN-03, RN-04) y <c>[...]</c> se omite completo si alguna variable que contiene está vacía.
+/// Un "." de la plantilla justo después de una variable se omite si el valor ya cierra la oración, para no duplicar
+/// la puntuación; el valor se inserta igual.
 /// </summary>
 public static partial class Plantilla
 {
@@ -43,13 +45,20 @@ public static partial class Plantilla
 
     // Los valores se insertan después de analizar la plantilla, así que un "[" o "{{" dentro de un valor queda literal.
     private static string Reemplazar(string texto, IReadOnlyDictionary<string, string?> valores) =>
-        Variables().Replace(texto, v => Valor(v.Groups[1].Value, valores) ?? "");
+        Variables().Replace(texto, v =>
+        {
+            var valor = Valor(v.Groups[1].Value, valores) ?? "";
+            var punto = v.Groups[2].Success && !CierraOracion(valor) ? "." : "";
+            return valor + punto;
+        });
+
+    private static bool CierraOracion(string valor) => valor.TrimEnd() is [.., '.' or '!' or '?' or '…'];
 
     private static string? Valor(string nombre, IReadOnlyDictionary<string, string?> valores) =>
         valores.TryGetValue(nombre, out var valor)
             ? valor
             : throw new KeyNotFoundException($"La plantilla usa la variable {{{{{nombre}}}}}, que no existe.");
 
-    [GeneratedRegex(@"\{\{([^{}]+)\}\}")]
+    [GeneratedRegex(@"\{\{([^{}]+)\}\}(\.)?")]
     private static partial Regex Variables();
 }

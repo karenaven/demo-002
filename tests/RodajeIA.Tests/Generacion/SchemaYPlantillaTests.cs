@@ -46,6 +46,36 @@ public class SchemaYPlantillaTests
         Assert.Equal("A (C).", Plantilla.Rellenar(plantilla, new Dictionary<string, string?> { ["a"] = "A", ["b"] = "", ["c"] = "C" }));
     }
 
+    [Theory]
+    [InlineData("Irónica y leal.", "Personalidad: Irónica y leal. Rol: X.")]
+    [InlineData("Irónica y leal", "Personalidad: Irónica y leal. Rol: X.")]
+    [InlineData("¿Leal?", "Personalidad: ¿Leal? Rol: X.")]
+    [InlineData("¡Leal!", "Personalidad: ¡Leal! Rol: X.")]
+    [InlineData("Leal…", "Personalidad: Leal… Rol: X.")]
+    [InlineData("Leal...", "Personalidad: Leal... Rol: X.")]
+    public void Plantilla_NoDuplicaElPuntoSiElValorYaCierraLaOracion(string personalidad, string esperado)
+    {
+        var valores = new Dictionary<string, string?> { ["p"] = personalidad, ["r"] = "X" };
+
+        Assert.Equal(esperado, Plantilla.Rellenar("Personalidad: {{p}}. Rol: {{r}}.", valores));
+    }
+
+    [Theory]
+    [InlineData("cicatriz.")]
+    [InlineData("cicatriz")]
+    public void Plantilla_NoDuplicaElPuntoDentroDeUnOpcional(string heridas)
+    {
+        var resultado = Plantilla.Rellenar("A.[ H: {{h}}.]", new Dictionary<string, string?> { ["h"] = heridas });
+
+        Assert.Equal("A. H: cicatriz.", resultado);
+    }
+
+    [Fact]
+    public void Plantilla_SinPuntoDespuesDeLaVariable_NoAgregaNada()
+    {
+        Assert.Equal("Ana sonríe ANA", Plantilla.Rellenar("{{a}} {{b}}", new Dictionary<string, string?> { ["a"] = "Ana sonríe", ["b"] = "ANA" }));
+    }
+
     [Fact]
     public void Plantilla_InsertaLosValoresLiterales()
     {
