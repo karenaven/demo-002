@@ -1,0 +1,33 @@
+@* Borrado en dos pasos: el primer clic pide confirmación y explica qué se borra. *@
+
+@if (confirmando)
+{
+    <span class="confirmar" role="alert">
+        @Pregunta
+        <button type="button" class="peligro" @onclick="ConfirmarAsync">Sí, eliminar</button>
+        <button type="button" class="secundario" @onclick="() => confirmando = false">Cancelar</button>
+    </span>
+}
+else
+{
+    <button type="button" class="secundario" @onclick="() => confirmando = true">@Texto</button>
+}
+
+@code {
+    [Parameter]
+    public string Texto { get; set; } = "Eliminar";
+
+    [Parameter, EditorRequired]
+    public string Pregunta { get; set; } = "";
+
+    [Parameter]
+    public EventCallback OnConfirmar { get; set; }
+
+    private bool confirmando;
+
+    private async Task ConfirmarAsync()
+    {
+        confirmando = false;
+        await OnConfirmar.InvokeAsync();
+    }
+}

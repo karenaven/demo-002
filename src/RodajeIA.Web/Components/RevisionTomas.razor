@@ -1,0 +1,137 @@
+@inject TomasService TomasService
+@inject ConfiguracionGeneracion Config
+
+@* Revisión y edición de las tomas de una escena generada (RF-07). Cada toma se guarda por separado. *@
+
+@if (clips is null)
+{
+    <p>Cargando…</p>
+}
+else
+{
+    @foreach (var clip in clips.Where(c => c.Bloque is not null))
+    {
+        <div class="bloque">
+            <h4>Bloque @clip.Numero</h4>
+            @foreach (var toma in clip.Bloque!.Tomas)
+            {
+                var datos = edicion[toma.Id];
+                <div class="toma" @key="toma.Id">
+                    <div class="toma-campos">
+                        <label>Plano <Selector Valores="Valores(Vocabulario.Plano)" @bind-Valor="datos.Plano" /></label>
+                        <label>Óptica <Selector Valores="Valores(Vocabulario.Optica)" @bind-Valor="datos.Optica" /></label>
+                        <label>Iluminación <Selector Valores="Valores(Vocabulario.Iluminacion)" @bind-Valor="datos.Iluminacion" /></label>
+                        <label>Ángulo <Selector Valores="Valores(Vocabulario.Angulo)" @bind-Valor="datos.Angulo" Opcional="true" /></label>
+                        <label>Movimiento <Selector Valores="Valores(Vocabulario.Movimiento)" @bind-Valor="datos.Movimiento" Opcional="true" /></label>
+                    </div>
+                    <label class="toma-accion">
+                        Acción
+                        <textarea @bind="datos.Accion" @bind:event="oninput" rows="2"></textarea>
+                    </label>
+                    @if (toma.Dialogos.Count > 0)
+                    {
+                        <p class="toma-dialogos">
+                            @foreach (var referencia in toma.Dialogos)
+                            {
+                                <span>@Linea(referencia.LineaDialogo!)</span>
+                            }
+                        </p>
+                    }
+                    <div class="fila">
+                        <button type="button" @onclick="() => GuardarAsync(toma)" disabled="@(!Cambio(toma, datos))">Guardar toma</button>
+                        @if (Cambio(toma, datos))
+                        {
+                            <button type="button" class="secundario" @onclick="() => Descartar(toma)">Descartar cambios</button>
+                        }
+                        @if (guardada == toma.Id)
+                        {
+                            <span class="exito">Guardada</span>
+                        }
+                    </div>
+                    @if (errores.TryGetValue(toma.Id, out var mensajes))
+                    {
+                        <Errores Mensajes="mensajes" />
+                    }
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int EscenaId { get; set; }
+
+    /// <summary>Se llama después de guardar una toma, para volver a armar el prompt (RF-07d).</summary>
+    [Parameter]
+    public EventCallback OnGuardada { get; set; }
+
+    private int? cargada;
+    private List<Clip>? clips;
+    private Dictionary<int, DatosToma> edicion = [];
+    private Dictionary<int, IReadOnlyList<string>> errores = [];
+    private int? guardada;
+
+    // Solo se recarga si cambia la escena: así un aviso de generación de otra escena no borra lo que se está editando.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (cargada != EscenaId)
+        {
+            cargada = EscenaId;
+            await CargarAsync();
+        }
+    }
+
+    private async Task CargarAsync()
+    {
+        clips = await TomasService.ListarBloquesAsync(EscenaId);
+        edicion = clips.Where(c => c.Bloque is not null)
+            .SelectMany(c => c.Bloque!.Tomas)
+            .ToDictionary(t => t.Id, DatosToma.De);
+    }
+
+    private IReadOnlyList<string> Valores(string categoria) => Config.Vocabulario[categoria].Valores;
+
+    private string Linea(LineaDialogo linea) =>
+        $"{linea.Personaje}{(linea.Acotacion is null ? "" : $" ({linea.Acotacion})")}: \"{linea.Texto}\"";
+
+    private static bool Cambio(Toma toma, DatosToma datos) =>
+        toma.Plano != datos.Plano
+        || toma.Optica != datos.Optica
+        || toma.Iluminacion != datos.Iluminacion
+        || toma.Angulo != Vacio(datos.Angulo)
+        || toma.Movimiento != Vacio(datos.Movimiento)
+        || toma.Accion != datos.Accion?.Trim();
+
+    private static string? Vacio(string? valor) => string.IsNullOrEmpty(valor) ? null : valor;
+
+    private void Descartar(Toma toma)
+    {
+        edicion[toma.Id] = DatosToma.De(toma);
+        errores.Remove(toma.Id);
+    }
+
+    private async Task GuardarAsync(Toma toma)
+    {
+        guardada = null;
+        var resultado = await TomasService.EditarAsync(toma.Id, edicion[toma.Id]);
+        if (!resultado.Ok)
+        {
+            errores[toma.Id] = resultado.Errores;
+            return;
+        }
+
+        // Solo se actualiza esta toma, para no perder lo que se esté editando en las demás.
+        var guardadaEnBase = resultado.Valor!;
+        toma.Plano = guardadaEnBase.Plano;
+        toma.Optica = guardadaEnBase.Optica;
+        toma.Iluminacion = guardadaEnBase.Iluminacion;
+        toma.Angulo = guardadaEnBase.Angulo;
+        toma.Movimiento = guardadaEnBase.Movimiento;
+        toma.Accion = guardadaEnBase.Accion;
+        edicion[toma.Id] = DatosToma.De(toma);
+        errores.Remove(toma.Id);
+        guardada = toma.Id;
+        await OnGuardada.InvokeAsync();
+    }
+}

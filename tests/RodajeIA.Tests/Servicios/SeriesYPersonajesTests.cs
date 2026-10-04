@@ -138,4 +138,75 @@ public sealed class SeriesYPersonajesTests : IDisposable
 
         Assert.Equal(7, resultado.Errores.Count);
     }
+
+    // AC-01c
+    [Fact]
+    public async Task EditarNombreDeSerie_ElListadoMuestraElNuevo()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+
+        var resultado = await series.EditarAsync(serie.Id, "Serie B");
+
+        Assert.True(resultado.Ok);
+        Assert.Equal(["Serie B"], (await series.ListarAsync()).Select(s => s.Nombre));
+    }
+
+    [Fact]
+    public async Task EditarSerieSinNombre_NoCambia()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+
+        Assert.False((await series.EditarAsync(serie.Id, "  ")).Ok);
+
+        Assert.Equal("Serie A", (await series.ObtenerAsync(serie.Id))!.Nombre);
+    }
+
+    // AC-01g
+    [Fact]
+    public async Task EditarVestuarioDeLaHoja_QuedaGuardado()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var hoja = (await personajes.CrearAsync(serie.Id, HojaCompleta())).Valor!;
+        var datos = DatosPersonaje.De(hoja);
+        datos.Vestuario = "camisa blanca";
+
+        var resultado = await personajes.EditarAsync(hoja.Id, datos);
+
+        Assert.True(resultado.Ok);
+        var guardada = Assert.Single(await personajes.ListarAsync(serie.Id));
+        Assert.Equal("camisa blanca", guardada.Vestuario);
+        Assert.Equal(hoja.Peinado, guardada.Peinado);
+    }
+
+    // AC-01k
+    [Fact]
+    public async Task EditarHojaDejandoElPeinadoVacio_NoSeGuardaEIndicaQueFalta()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var hoja = (await personajes.CrearAsync(serie.Id, HojaCompleta())).Valor!;
+        var datos = DatosPersonaje.De(hoja);
+        datos.Peinado = "";
+        datos.Vestuario = "camisa blanca";
+
+        var resultado = await personajes.EditarAsync(hoja.Id, datos);
+
+        Assert.False(resultado.Ok);
+        Assert.Equal(["Falta el peinado."], resultado.Errores);
+        var guardada = Assert.Single(await personajes.ListarAsync(serie.Id));
+        Assert.Equal("trenza larga", guardada.Peinado);
+        Assert.Equal("chaqueta negra", guardada.Vestuario);
+    }
+
+    [Fact]
+    public async Task EditarHoja_PermiteQuitarLasHeridas()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var hoja = (await personajes.CrearAsync(serie.Id, HojaCompleta())).Valor!;
+        var datos = DatosPersonaje.De(hoja);
+        datos.Heridas = " ";
+
+        Assert.True((await personajes.EditarAsync(hoja.Id, datos)).Ok);
+
+        Assert.Null(Assert.Single(await personajes.ListarAsync(serie.Id)).Heridas);
+    }
 }

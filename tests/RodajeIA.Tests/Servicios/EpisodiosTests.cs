@@ -81,4 +81,40 @@ public sealed class EpisodiosTests : IDisposable
         Assert.Equal(2, resultado.Errores.Count);
         Assert.Empty(await episodios.ListarAsync(serie.Id));
     }
+
+    // AC-11c
+    [Fact]
+    public async Task EditarTitulo_ElListadoMuestraElNuevo()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var episodio = (await episodios.CrearAsync(serie.Id, new DatosEpisodio { Numero = 1, Titulo = "Piloto" })).Valor!;
+
+        var resultado = await episodios.EditarTituloAsync(episodio.Id, "La cena");
+
+        Assert.True(resultado.Ok);
+        Assert.Equal(["La cena"], (await episodios.ListarAsync(serie.Id)).Select(e => e.Titulo));
+    }
+
+    // AC-11g: la edición solo admite el título, así que el número no cambia.
+    [Fact]
+    public async Task EditarTitulo_ConservaElNumero()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var episodio = (await episodios.CrearAsync(serie.Id, new DatosEpisodio { Numero = 1, Titulo = "Piloto" })).Valor!;
+
+        await episodios.EditarTituloAsync(episodio.Id, "La cena");
+
+        Assert.Equal(1, Assert.Single(await episodios.ListarAsync(serie.Id)).Numero);
+    }
+
+    [Fact]
+    public async Task EditarTituloVacio_NoCambia()
+    {
+        var serie = (await series.CrearAsync("Serie A")).Valor!;
+        var episodio = (await episodios.CrearAsync(serie.Id, new DatosEpisodio { Numero = 1, Titulo = "Piloto" })).Valor!;
+
+        Assert.False((await episodios.EditarTituloAsync(episodio.Id, " ")).Ok);
+
+        Assert.Equal("Piloto", Assert.Single(await episodios.ListarAsync(serie.Id)).Titulo);
+    }
 }

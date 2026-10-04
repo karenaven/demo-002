@@ -213,7 +213,7 @@ public sealed class VariantesTests : IDisposable
         Assert.DoesNotContain("abrigo gris", prompt);
     }
 
-    // AC-01h (en la base de datos; la pantalla para eliminar hojas es de RF-01h)
+    // AC-01h
     [Fact]
     public async Task BorrarLaHoja_BorraSusVariantesAunqueLaEscenaEsteGenerada()
     {
@@ -221,12 +221,11 @@ public sealed class VariantesTests : IDisposable
         var variante = await CrearAsync(ana, new DatosVariante { Vestuario = "abrigo gris" });
         await e.CambiarEstadoAsync(2, EstadoGeneracion.Generada);
 
-        await using (var db = e.Db.CreateDbContext())
-        {
-            await db.Personajes.Where(p => p.Id == ana.Id).ExecuteDeleteAsync(Cancelar);
-        }
+        Assert.True(await new PersonajesService(e.Db).EliminarAsync(ana.Id));
 
         Assert.Null(await GuardadaAsync(variante.Id));
+        await using var db = e.Db.CreateDbContext();
+        Assert.False(await db.Personajes.AnyAsync(p => p.Id == ana.Id, Cancelar));
     }
 
     // AC-02c: recargar el guion borra los bloques, tomas y variantes del anterior.

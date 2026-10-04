@@ -18,6 +18,7 @@ builder.Services.AddScoped<EpisodiosService>();
 builder.Services.AddScoped<CargaGuionService>();
 builder.Services.AddScoped<VariantesService>();
 builder.Services.AddScoped<PromptFinalService>();
+builder.Services.AddScoped<TomasService>();
 
 // Generación con Gemini (RF-06, RF-10): corre en segundo plano, fuera del circuito de Blazor.
 builder.Services.Configure<OpcionesGemini>(builder.Configuration.GetSection("Gemini"));

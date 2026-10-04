@@ -1,0 +1,37 @@
+@* Lista desplegable con los valores del vocabulario (RN-02): no permite escribir valores libres. *@
+
+<select value="@(Valor ?? "")" @onchange="CambiarAsync">
+    @if (Opcional)
+    {
+        <option value="">(sin valor)</option>
+    }
+    else if (Valor is null)
+    {
+        <option value="">Elegí un valor</option>
+    }
+    @foreach (var valor in Valores)
+    {
+        <option value="@valor">@valor</option>
+    }
+</select>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Valores { get; set; } = [];
+
+    [Parameter]
+    public string? Valor { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValorChanged { get; set; }
+
+    /// <summary>Si es verdadero, se puede dejar sin valor (ángulo y movimiento).</summary>
+    [Parameter]
+    public bool Opcional { get; set; }
+
+    private Task CambiarAsync(ChangeEventArgs e)
+    {
+        var valor = e.Value?.ToString();
+        return ValorChanged.InvokeAsync(string.IsNullOrEmpty(valor) ? null : valor);
+    }
+}

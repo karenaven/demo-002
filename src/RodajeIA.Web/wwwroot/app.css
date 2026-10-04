@@ -210,6 +210,70 @@ button.secundario {
     background: var(--fondo);
 }
 
+.titulo h1 {
+    margin-right: 0.5rem;
+}
+
+button.peligro {
+    background: var(--error);
+    border-color: var(--error);
+}
+
+.confirmar {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    color: var(--error);
+}
+
+.revision {
+    margin-top: 0.75rem;
+}
+
+.revision summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.bloque h4 {
+    margin: 1rem 0 0.5rem;
+}
+
+.toma {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+}
+
+.toma-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.5rem;
+}
+
+.toma label {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.toma textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.toma-dialogos {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--tenue);
+}
+
 .invalid {
     outline: 1px solid var(--error);
 }

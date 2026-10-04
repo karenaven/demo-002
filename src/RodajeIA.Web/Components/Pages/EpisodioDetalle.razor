@@ -72,6 +72,11 @@ else
                         }
                     </div>
                     <pre class="prompt">@prompt</pre>
+
+                    <details class="revision">
+                        <summary>Revisar y editar tomas</summary>
+                        <RevisionTomas EscenaId="escena.Id" OnGuardada="RecargarPromptsAsync" />
+                    </details>
                 }
             </article>
         }
@@ -101,6 +106,13 @@ else
     {
         escenas = await EpisodiosService.ListarEscenasAsync(Id);
         prompts = await PromptFinalService.ArmarEpisodioAsync(Id);
+    }
+
+    // El prompt se vuelve a armar desde lo guardado después de editar una toma (RF-07d).
+    private async Task RecargarPromptsAsync()
+    {
+        prompts = await PromptFinalService.ArmarEpisodioAsync(Id);
+        copiada = null;
     }
 
     // Los avisos llegan desde la generación en segundo plano, fuera del contexto de render.

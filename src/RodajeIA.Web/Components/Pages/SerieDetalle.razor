@@ -2,6 +2,7 @@
 @inject SeriesService SeriesService
 @inject PersonajesService PersonajesService
 @inject EpisodiosService EpisodiosService
+@inject NavigationManager Navegacion
 
 <PageTitle>@(serie?.Nombre ?? "Serie") · RodajeIA</PageTitle>
 
@@ -17,7 +18,26 @@ else if (serie is null)
 else
 {
     <p><a href="">← Series</a></p>
-    <h1>@serie.Nombre</h1>
+
+    @if (nombreSerie is not null)
+    {
+        <form class="fila" @onsubmit="GuardarNombreAsync">
+            <input @bind="nombreSerie" aria-label="Nombre de la serie" />
+            <button type="submit">Guardar</button>
+            <button type="button" class="secundario" @onclick="() => { nombreSerie = null; erroresSerie = []; }">Cancelar</button>
+        </form>
+    }
+    else
+    {
+        <div class="fila titulo">
+            <h1>@serie.Nombre</h1>
+            <button type="button" class="secundario" @onclick="() => nombreSerie = serie.Nombre">Editar nombre</button>
+            <BotonEliminar Texto="Eliminar serie"
+                           Pregunta="Se borran la serie, sus hojas de personaje y sus episodios con todas sus escenas, bloques y variantes."
+                           OnConfirmar="EliminarSerieAsync" />
+        </div>
+    }
+    <Errores Mensajes="erroresSerie" />
 
     <section>
         <h2>Personajes</h2>
@@ -29,7 +49,7 @@ else
         {
             <table>
                 <thead>
-                    <tr><th>Nombre</th><th>Edad</th><th>Rol</th><th>Peinado</th><th>Vestuario</th><th>Heridas/marcas</th></tr>
+                    <tr><th>Nombre</th><th>Edad</th><th>Rol</th><th>Peinado</th><th>Vestuario</th><th>Heridas/marcas</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var personaje in personajes)
@@ -41,35 +61,53 @@ else
                             <td>@personaje.Peinado</td>
                             <td>@personaje.Vestuario</td>
                             <td>@personaje.Heridas</td>
+                            <td class="fila">
+                                <button type="button" class="secundario" @onclick="() => EditarHoja(personaje)">Editar</button>
+                                <BotonEliminar Pregunta="@($"Se borran la hoja de {personaje.Nombre} y todas sus variantes, también las de escenas ya generadas.")"
+                                               OnConfirmar="() => EliminarHojaAsync(personaje.Id)" />
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
 
-        <details open="@(personajes.Count == 0)">
-            <summary>Nueva hoja de personaje</summary>
-            <EditForm Model="nuevoPersonaje" OnValidSubmit="CrearPersonajeAsync" FormName="nuevo-personaje" class="formulario">
+        <details open="@(personajes.Count == 0 || hojaEditada is not null)">
+            <summary>@(hojaEditada is null ? "Nueva hoja de personaje" : $"Editar la hoja de {hojaEditada.Nombre}")</summary>
+            <EditForm Model="hoja" OnValidSubmit="GuardarHojaAsync" FormName="hoja-personaje" class="formulario">
                 <DataAnnotationsValidator />
                 <label>Nombre <small>(como aparece en el guion, con mayúscula inicial y tildes)</small>
-                    <InputText @bind-Value="nuevoPersonaje.Nombre" />
+                    <InputText @bind-Value="hoja.Nombre" />
                 </label>
-                <ValidationMessage For="() => nuevoPersonaje.Nombre" />
-                <label>Edad <InputText @bind-Value="nuevoPersonaje.Edad" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.Edad" />
-                <label>Descripción física (incluye voz) <InputTextArea @bind-Value="nuevoPersonaje.DescripcionFisica" rows="3" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.DescripcionFisica" />
-                <label>Peinado <InputText @bind-Value="nuevoPersonaje.Peinado" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.Peinado" />
-                <label>Vestuario <InputText @bind-Value="nuevoPersonaje.Vestuario" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.Vestuario" />
-                <label>Heridas/marcas <small>(opcional)</small> <InputText @bind-Value="nuevoPersonaje.Heridas" /></label>
-                <label>Personalidad <InputTextArea @bind-Value="nuevoPersonaje.Personalidad" rows="2" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.Personalidad" />
-                <label>Rol <InputText @bind-Value="nuevoPersonaje.Rol" /></label>
-                <ValidationMessage For="() => nuevoPersonaje.Rol" />
+                <ValidationMessage For="() => hoja.Nombre" />
+                <label>Edad <InputText @bind-Value="hoja.Edad" /></label>
+                <ValidationMessage For="() => hoja.Edad" />
+                <label>Descripción física (incluye voz) <InputTextArea @bind-Value="hoja.DescripcionFisica" rows="3" /></label>
+                <ValidationMessage For="() => hoja.DescripcionFisica" />
+                <label>Peinado <InputText @bind-Value="hoja.Peinado" /></label>
+                <ValidationMessage For="() => hoja.Peinado" />
+                <label>Vestuario <InputText @bind-Value="hoja.Vestuario" /></label>
+                <ValidationMessage For="() => hoja.Vestuario" />
+                <label>Heridas/marcas <small>(opcional)</small> <InputText @bind-Value="hoja.Heridas" /></label>
+                <label>Personalidad <InputTextArea @bind-Value="hoja.Personalidad" rows="2" /></label>
+                <ValidationMessage For="() => hoja.Personalidad" />
+                <label>Rol <InputText @bind-Value="hoja.Rol" /></label>
+                <ValidationMessage For="() => hoja.Rol" />
+                @if (hojaEditada is not null)
+                {
+                    <p class="aviso">
+                        Los prompts de las escenas ya generadas van a usar la hoja nueva. Si cambiás el nombre,
+                        volvé a cargar el guion para que se detecte el personaje con el nombre nuevo.
+                    </p>
+                }
                 <Errores Mensajes="erroresPersonaje" />
-                <button type="submit">Crear personaje</button>
+                <div class="fila">
+                    <button type="submit">@(hojaEditada is null ? "Crear personaje" : "Guardar cambios")</button>
+                    @if (hojaEditada is not null)
+                    {
+                        <button type="button" class="secundario" @onclick="CancelarHoja">Cancelar</button>
+                    }
+                </div>
             </EditForm>
         </details>
     </section>
@@ -91,13 +129,32 @@ else
                     {
                         <tr>
                             <td>@episodio.Numero</td>
-                            <td><a href="episodios/@episodio.Id">@episodio.Titulo</a></td>
+                            <td>
+                                @if (episodioEditado == episodio.Id)
+                                {
+                                    <form class="fila" @onsubmit="GuardarTituloAsync">
+                                        <input @bind="tituloEpisodio" aria-label="Título" />
+                                        <button type="submit">Guardar</button>
+                                        <button type="button" class="secundario" @onclick="CancelarTitulo">Cancelar</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <a href="episodios/@episodio.Id">@episodio.Titulo</a>
+                                }
+                            </td>
                             <td>@(episodio.Guion is null ? "Sin guion" : "Cargado")</td>
-                            <td><a href="cargar-guion?serie=@serie.Id&episodio=@episodio.Id">Cargar guion</a></td>
+                            <td class="fila">
+                                <a href="cargar-guion?serie=@serie.Id&episodio=@episodio.Id">Cargar guion</a>
+                                <button type="button" class="secundario" @onclick="() => EditarTitulo(episodio)">Editar título</button>
+                                <BotonEliminar Pregunta="@($"Se borran el episodio {episodio.Numero} con su guion, escenas, bloques y variantes.")"
+                                               OnConfirmar="() => EliminarEpisodioAsync(episodio.Id)" />
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
+            <Errores Mensajes="erroresTitulo" />
         }
 
         <EditForm Model="nuevoEpisodio" OnValidSubmit="CrearEpisodioAsync" FormName="nuevo-episodio" class="fila">
@@ -119,10 +176,16 @@ else
     private Serie? serie;
     private List<Personaje> personajes = [];
     private List<Episodio> episodios = [];
-    private DatosPersonaje nuevoPersonaje = new();
+    private string? nombreSerie;
+    private DatosPersonaje hoja = new();
+    private Personaje? hojaEditada;
     private DatosEpisodio nuevoEpisodio = new();
+    private int? episodioEditado;
+    private string? tituloEpisodio;
+    private IReadOnlyList<string> erroresSerie = [];
     private IReadOnlyList<string> erroresPersonaje = [];
     private IReadOnlyList<string> erroresEpisodio = [];
+    private IReadOnlyList<string> erroresTitulo = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -136,15 +199,59 @@ else
         cargando = false;
     }
 
-    private async Task CrearPersonajeAsync()
+    private async Task GuardarNombreAsync()
     {
-        var resultado = await PersonajesService.CrearAsync(Id, nuevoPersonaje);
+        var resultado = await SeriesService.EditarAsync(Id, nombreSerie);
+        erroresSerie = resultado.Errores;
+        if (resultado.Ok)
+        {
+            nombreSerie = null;
+            serie = await SeriesService.ObtenerAsync(Id);
+        }
+    }
+
+    private async Task EliminarSerieAsync()
+    {
+        await SeriesService.EliminarAsync(Id);
+        Navegacion.NavigateTo("");
+    }
+
+    private void EditarHoja(Personaje personaje)
+    {
+        hojaEditada = personaje;
+        hoja = DatosPersonaje.De(personaje);
+        erroresPersonaje = [];
+    }
+
+    private void CancelarHoja()
+    {
+        hojaEditada = null;
+        hoja = new();
+        erroresPersonaje = [];
+    }
+
+    private async Task GuardarHojaAsync()
+    {
+        var resultado = hojaEditada is null
+            ? await PersonajesService.CrearAsync(Id, hoja)
+            : await PersonajesService.EditarAsync(hojaEditada.Id, hoja);
         erroresPersonaje = resultado.Errores;
         if (resultado.Ok)
         {
-            nuevoPersonaje = new();
+            CancelarHoja();
             personajes = await PersonajesService.ListarAsync(Id);
         }
+    }
+
+    private async Task EliminarHojaAsync(int personajeId)
+    {
+        await PersonajesService.EliminarAsync(personajeId);
+        if (hojaEditada?.Id == personajeId)
+        {
+            CancelarHoja();
+        }
+
+        personajes = await PersonajesService.ListarAsync(Id);
     }
 
     private async Task CrearEpisodioAsync()
@@ -156,5 +263,35 @@ else
             nuevoEpisodio = new();
             episodios = await EpisodiosService.ListarAsync(Id);
         }
+    }
+
+    private void EditarTitulo(Episodio episodio)
+    {
+        episodioEditado = episodio.Id;
+        tituloEpisodio = episodio.Titulo;
+        erroresTitulo = [];
+    }
+
+    private void CancelarTitulo()
+    {
+        episodioEditado = null;
+        erroresTitulo = [];
+    }
+
+    private async Task GuardarTituloAsync()
+    {
+        var resultado = await EpisodiosService.EditarTituloAsync(episodioEditado!.Value, tituloEpisodio);
+        erroresTitulo = resultado.Errores;
+        if (resultado.Ok)
+        {
+            episodioEditado = null;
+            episodios = await EpisodiosService.ListarAsync(Id);
+        }
+    }
+
+    private async Task EliminarEpisodioAsync(int episodioId)
+    {
+        await EpisodiosService.EliminarAsync(episodioId);
+        episodios = await EpisodiosService.ListarAsync(Id);
     }
 }

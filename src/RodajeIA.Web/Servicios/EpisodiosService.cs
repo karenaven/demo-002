@@ -47,6 +47,34 @@ public class EpisodiosService(IDbContextFactory<RodajeDbContext> contextos)
         return await db.Episodios.AsNoTracking().Where(e => e.SerieId == serieId).OrderBy(e => e.Numero).ToListAsync();
     }
 
+    /// <summary>Cambia el título del episodio; el número no se puede cambiar (RF-11c).</summary>
+    public async Task<Resultado<Episodio>> EditarTituloAsync(int id, string? titulo)
+    {
+        if (string.IsNullOrWhiteSpace(titulo))
+        {
+            return Resultado<Episodio>.Fallo("Falta el título.");
+        }
+
+        await using var db = await contextos.CreateDbContextAsync();
+        var episodio = await db.Episodios.SingleOrDefaultAsync(e => e.Id == id);
+        if (episodio is null)
+        {
+            return Resultado<Episodio>.Fallo("El episodio no existe.");
+        }
+
+        episodio.Titulo = titulo.Trim();
+        await db.SaveChangesAsync();
+        return Resultado<Episodio>.Exito(episodio);
+    }
+
+    /// <summary>Elimina el episodio con su guion, escenas, clips, bloques y variantes (RF-11d).</summary>
+    /// <returns>Si el episodio existía.</returns>
+    public async Task<bool> EliminarAsync(int id)
+    {
+        await using var db = await contextos.CreateDbContextAsync();
+        return await db.Episodios.Where(e => e.Id == id).ExecuteDeleteAsync() > 0;
+    }
+
     public async Task<Episodio?> ObtenerAsync(int id)
     {
         await using var db = await contextos.CreateDbContextAsync();

@@ -29,16 +29,27 @@ public class DatosPersonaje
 
     [Required(ErrorMessage = "Falta el rol.")]
     public string? Rol { get; set; }
+
+    public static DatosPersonaje De(Personaje hoja) => new()
+    {
+        Nombre = hoja.Nombre,
+        Edad = hoja.Edad,
+        DescripcionFisica = hoja.DescripcionFisica,
+        Peinado = hoja.Peinado,
+        Vestuario = hoja.Vestuario,
+        Heridas = hoja.Heridas,
+        Personalidad = hoja.Personalidad,
+        Rol = hoja.Rol,
+    };
 }
 
 public class PersonajesService(IDbContextFactory<RodajeDbContext> contextos)
 {
     public async Task<Resultado<Personaje>> CrearAsync(int serieId, DatosPersonaje datos)
     {
-        var errores = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(datos, new ValidationContext(datos), errores, validateAllProperties: true))
+        if (Validar(datos) is { Count: > 0 } errores)
         {
-            return Resultado<Personaje>.Fallo(errores.Select(e => e.ErrorMessage!).ToList());
+            return Resultado<Personaje>.Fallo(errores);
         }
 
         await using var db = await contextos.CreateDbContextAsync();
@@ -55,7 +66,7 @@ public class PersonajesService(IDbContextFactory<RodajeDbContext> contextos)
             DescripcionFisica = datos.DescripcionFisica!.Trim(),
             Peinado = datos.Peinado!.Trim(),
             Vestuario = datos.Vestuario!.Trim(),
-            Heridas = string.IsNullOrWhiteSpace(datos.Heridas) ? null : datos.Heridas.Trim(),
+            Heridas = Opcional(datos.Heridas),
             Personalidad = datos.Personalidad!.Trim(),
             Rol = datos.Rol!.Trim(),
         };
@@ -69,4 +80,56 @@ public class PersonajesService(IDbContextFactory<RodajeDbContext> contextos)
         await using var db = await contextos.CreateDbContextAsync();
         return await db.Personajes.AsNoTracking().Where(p => p.SerieId == serieId).OrderBy(p => p.Nombre).ToListAsync();
     }
+
+    /// <summary>
+    /// Edita la hoja sin dejar vacío ningún campo obligatorio (RF-01g); si falla, la hoja guardada no cambia.
+    /// El prompt de las escenas ya generadas toma la hoja nueva; la detección de personajes no se vuelve a correr.
+    /// </summary>
+    public async Task<Resultado<Personaje>> EditarAsync(int id, DatosPersonaje datos)
+    {
+        if (Validar(datos) is { Count: > 0 } errores)
+        {
+            return Resultado<Personaje>.Fallo(errores);
+        }
+
+        await using var db = await contextos.CreateDbContextAsync();
+        var personaje = await db.Personajes.SingleOrDefaultAsync(p => p.Id == id);
+        if (personaje is null)
+        {
+            return Resultado<Personaje>.Fallo("La hoja de personaje no existe.");
+        }
+
+        Aplicar(personaje, datos);
+        await db.SaveChangesAsync();
+        return Resultado<Personaje>.Exito(personaje);
+    }
+
+    /// <summary>Elimina la hoja con todas sus variantes, en cualquier estado de la escena (RF-01h).</summary>
+    /// <returns>Si la hoja existía.</returns>
+    public async Task<bool> EliminarAsync(int id)
+    {
+        await using var db = await contextos.CreateDbContextAsync();
+        return await db.Personajes.Where(p => p.Id == id).ExecuteDeleteAsync() > 0;
+    }
+
+    private static List<string> Validar(DatosPersonaje datos)
+    {
+        var errores = new List<ValidationResult>();
+        Validator.TryValidateObject(datos, new ValidationContext(datos), errores, validateAllProperties: true);
+        return errores.Select(e => e.ErrorMessage!).ToList();
+    }
+
+    private static void Aplicar(Personaje personaje, DatosPersonaje datos)
+    {
+        personaje.Nombre = datos.Nombre!.Trim();
+        personaje.Edad = datos.Edad!.Trim();
+        personaje.DescripcionFisica = datos.DescripcionFisica!.Trim();
+        personaje.Peinado = datos.Peinado!.Trim();
+        personaje.Vestuario = datos.Vestuario!.Trim();
+        personaje.Heridas = Opcional(datos.Heridas);
+        personaje.Personalidad = datos.Personalidad!.Trim();
+        personaje.Rol = datos.Rol!.Trim();
+    }
+
+    private static string? Opcional(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 }
